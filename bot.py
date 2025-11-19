@@ -3,7 +3,17 @@ import sqlite3
 import json
 import os
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
+from telegram.ext import Updater, ApplicationBuilder
+
+def main():
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
+    
+    # Handler'ları ekle
+    app.add_handler(CommandHandler("start", start))
+    # ... diğer handler'lar
+    
+    # Polling başlat
+    app.run_polling()
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
