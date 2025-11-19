@@ -1,15 +1,16 @@
 import logging
 import sqlite3
 import json
+import os
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# 🔧 AYARLAR
-BOT_TOKEN = "7847386023:AAHkyscfv9vkhAD6y89TKYvF6VZ6t6697Rw"
-ADMIN_IDS = [7536095127]  # ⚠️ KENDİ ID'Nİ YAZ!
+# 🔧 AYARLAR - Render Environment Variables
+BOT_TOKEN = os.environ.get('BOT_TOKEN', "7847386023:AAHkyscfv9vkhAD6y89TKYvF6VZ6t6697Rw")
+ADMIN_IDS = [int(os.environ.get('ADMIN_IDS', "7536095127"))]  # ⚠️ KENDİ ID'Nİ YAZ!
 DATABASE_PATH = "data/escort_bot.db"
 
 # 🏙️ VERİLER
@@ -139,7 +140,17 @@ def init_database():
              'Yaş: 21\nBoy: 168 cm\nKilo: 56 kg\n\nİstanbulda özel eskort hizmeti.', 
              'https://api.whatsapp.com/send/?phone=905344799206&text=Merhaba%20Kral%20Hesap%C4%B1n%20sitesinden%20geliyorum.', 
              '+905344799206', 
-             'https://images.unsplash.com/photo-1519699047748-de8e457a634e?w=400')
+             'https://images.unsplash.com/photo-1519699047748-de8e457a634e?w=400'),
+            
+            ('Ayşe Yılmaz', 22, 170, 'Türk', 'İstanbul', 
+             'Profesyonel eskort hizmeti. Özel randevu ile çalışıyorum.', 
+             'https://wa.me/905551234567', '+905551234567', 
+             'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400'),
+            
+            ('Maria Ivanova', 26, 175, 'Rus', 'İstanbul', 
+             'Rus eskort, İngilizce ve Türkçe konuşuyorum. Lüks hizmet.', 
+             'https://wa.me/905551234568', '+905551234568', 
+             'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400')
         ]
         
         for profile in sample_profiles:
@@ -152,41 +163,6 @@ def init_database():
     conn.commit()
     conn.close()
     print("✅ Veritabanı hazır!")
-
-def add_profile(profile_data):
-    conn = sqlite3.connect(DATABASE_PATH)
-    cursor = conn.cursor()
-    
-    try:
-        print(f"Eklenecek profil: {profile_data}")  # Debug
-        
-        cursor.execute('''
-            INSERT INTO profiles 
-            (name, age, height, nationality, city, description, whatsapp_link, phone_number, photo_url)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            profile_data['name'],
-            profile_data['age'],
-            profile_data['height'],
-            profile_data['nationality'],
-            profile_data['city'],
-            profile_data['description'],
-            profile_data['whatsapp_link'],
-            profile_data['phone_number'],
-            profile_data.get('photo_url', '')  # photo_url yerine photos olabilir
-        ))
-        
-        conn.commit()
-        profile_id = cursor.lastrowid
-        print(f"Profil eklendi, ID: {profile_id}")  # Debug
-        return profile_id
-        
-    except Exception as e:
-        print(f"Veritabanı hatası: {e}")
-        conn.rollback()
-        return None
-    finally:
-        conn.close()
 
 def get_profiles_by_city(city):
     conn = sqlite3.connect(DATABASE_PATH)
@@ -340,8 +316,6 @@ async def show_profile(update: Update, context: ContextTypes.DEFAULT_TYPE, profi
             return
         except Exception as e:
             print(f"Fotoğraf hatası: {e}")
-            # Hata durumunda normal mesaj gönder
-            pass
     
     # Fotoğraf yoksa veya hata varsa normal mesaj
     if query:
@@ -498,7 +472,7 @@ async def apply_filters(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await query.edit_message_text("❌ *Uygun profil bulunamadı.*", reply_markup=filters_keyboard(), parse_mode='Markdown')
 
-# 🛠️ ADMIN FONKSİYONLARI - DIŞ FOTOĞRAF LİNK İLE
+# 🛠️ ADMIN FONKSİYONLARI
 async def admin_add_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     context.user_data['admin_profile'] = {}
@@ -523,8 +497,6 @@ async def handle_admin_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
     text = update.message.text
     step = context.user_data['admin_step']
     profile = context.user_data['admin_profile']
-    
-    print(f"Admin step: {step}, Text: {text}")  # Debug
     
     if step == 'photo_url':
         if text.lower() == 'hayır':
@@ -586,8 +558,6 @@ async def handle_admin_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
         else:
             profile['phone_number'] = text
         
-        print(f"Profil verisi: {profile}")  # Debug
-        
         profile_id = add_profile(profile)
         
         if profile_id:
@@ -613,7 +583,6 @@ async def handle_admin_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 parse_mode='Markdown'
             )
         
-        # Temizle
         context.user_data.pop('admin_step', None)
         context.user_data.pop('admin_profile', None)
 
@@ -693,7 +662,10 @@ async def admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # 🚀 BOT BAŞLATMA
 def main():
-    print("🎭 Bot başlatılıyor...")
+    print("🎭 Bot Render'da başlatılıyor...")
+    
+    # Render'da data klasörü yoksa oluştur
+    os.makedirs("data", exist_ok=True)
     
     init_database()
     
@@ -705,9 +677,8 @@ def main():
     app.add_handler(CallbackQueryHandler(handle_callbacks))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_admin_input))
     
-    print("✅ Bot hazır! /start")
+    print("✅ Bot Render'da hazır! /start")
     print("🛠️ Admin: /admin")
-    print("📸 Fotoğraf: Dış link ile ekleniyor!")
     
     app.run_polling()
 
